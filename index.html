@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calcolo Revisione Prezzi</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #2563eb;
+      --ok: #065f46;
+      --warn: #92400e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 16px 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin: 0 0 6px;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+      color: var(--muted);
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.95rem;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background: #f9fafb;
+      color: #374151;
+    }
+
+    .num { text-align: right; }
+
+    .results {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 10px;
+    }
+
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .kpi .label { color: var(--muted); font-size: 0.88rem; }
+    .kpi .value { font-size: 1.2rem; font-weight: 700; margin-top: 2px; }
+
+    .status {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+
+    .help {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+
+    .small {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    @media (max-width: 850px) {
+      .grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .results { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Calcolo Revisione Prezzi (D.Lgs. 36/2023 - Art.60)</h1>
+    <p class="subtitle">Calcolo importo di revisione con media ponderata indici, soglia parametrica e quota riconosciuta parametrica.</p>
+
+    <section class="card">
+      <div class="grid">
+        <div>
+          <label for="amount">Importo CPV</label>
+          <input id="amount" type="text" value="0" />
+        </div>
+        <div>
+          <label for="threshold">Soglia (default 5%)</label>
+          <input id="threshold" type="text" value="5" />
+          <div class="small">Inserisci percentuale (es. 5 oppure 7,5)</div>
+        </div>
+        <div>
+          <label for="quota">Quota riconosciuta (default 80%)</label>
+          <input id="quota" type="text" value="80" />
+          <div class="small">Inserisci percentuale (es. 80)</div>
+        </div>
+        <div>
+          <label for="rowsEnabled">Numero indici usati (1-10)</label>
+          <input id="rowsEnabled" type="number" min="1" max="10" value="10" />
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="calcBtn" type="button">Calcola</button>
+        <button id="resetBtn" type="button">Reset valori</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <table id="indicesTable">
+        <thead>
+          <tr>
+            <th style="width: 90px;">Indice</th>
+            <th>Indice base (I0)</th>
+            <th>Indice finale (It)</th>
+            <th>Peso %</th>
+            <th>Variazione %</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="weightsStatus" class="status"></div>
+      <div class="help">La somma dei pesi deve essere 100%. Le righe oltre il numero indici selezionato sono ignorate nel calcolo.</div>
+    </section>
+
+    <section class="card results">
+      <div class="kpi">
+        <div class="label">Variazione media ponderata</div>
+        <div class="value" id="weightedVar">0,00%</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Importo revisione</div>
+        <div class="value" id="revisionAmount">€ 0,00</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Importo aggiornato (CPV + revisione)</div>
+        <div class="value" id="updatedAmount">€ 0,00</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Esito soglia</div>
+        <div class="value" id="thresholdInfo">Nessun dato</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin:0 0 8px; font-size: 1.08rem;">Come viene calcolato</h2>
+      <div class="small">1) Per ogni indice: variazione = (It - I0) / I0</div>
+      <div class="small">2) Variazione media ponderata = SUM( var_i × peso_i ) / SUM(peso_i)</div>
+      <div class="small">3) Se |variazione| ≤ soglia, revisione = 0</div>
+      <div class="small">4) Se variazione &gt; soglia: revisione = Importo × quota × (variazione - soglia)</div>
+      <div class="small">5) Se variazione &lt; -soglia: revisione = Importo × quota × (variazione + soglia)</div>
+    </section>
+  </main>
+
+  <script>
+    const tbody = document.querySelector('#indicesTable tbody');
+    const amountEl = document.getElementById('amount');
+    const thresholdEl = document.getElementById('threshold');
+    const quotaEl = document.getElementById('quota');
+    const rowsEnabledEl = document.getElementById('rowsEnabled');
+    const weightedVarEl = document.getElementById('weightedVar');
+    const revisionAmountEl = document.getElementById('revisionAmount');
+    const updatedAmountEl = document.getElementById('updatedAmount');
+    const thresholdInfoEl = document.getElementById('thresholdInfo');
+    const weightsStatusEl = document.getElementById('weightsStatus');
+
+    function parseLocaleNumber(value) {
+      if (value === null || value === undefined) return NaN;
+      const normalized = String(value).trim().replace(/\s+/g, '').replace(',', '.');
+      if (normalized === '') return NaN;
+      return Number(normalized);
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value || 0);
+    }
+
+    function formatPercent(value) {
+      return new Intl.NumberFormat('it-IT', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
+    }
+
+    function buildRows() {
+      for (let i = 1; i <= 10; i++) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>Indice ${i}</td>
+          <td><input type="text" data-field="base" data-row="${i}" value="0"></td>
+          <td><input type="text" data-field="final" data-row="${i}" value="0"></td>
+          <td><input type="text" data-field="weight" data-row="${i}" value="0"></td>
+          <td class="num" data-field="variation" data-row="${i}">0,00%</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function getRowInputs(row) {
+      const base = document.querySelector(`input[data-field="base"][data-row="${row}"]`);
+      const final = document.querySelector(`input[data-field="final"][data-row="${row}"]`);
+      const weight = document.querySelector(`input[data-field="weight"][data-row="${row}"]`);
+      const variation = document.querySelector(`td[data-field="variation"][data-row="${row}"]`);
+      return { base, final, weight, variation };
+    }
+
+    function calculate() {
+      const amount = parseLocaleNumber(amountEl.value) || 0;
+      const thresholdPercent = parseLocaleNumber(thresholdEl.value) || 0;
+      const quotaPercent = parseLocaleNumber(quotaEl.value) || 0;
+      const threshold = thresholdPercent / 100;
+      const quota = quotaPercent / 100;
+      const rowsEnabled = Math.max(1, Math.min(10, parseInt(rowsEnabledEl.value || '10', 10)));
+      rowsEnabledEl.value = rowsEnabled;
+
+      let weightedSum = 0;
+      let weightSum = 0;
+
+      for (let row = 1; row <= 10; row++) {
+        const { base, final, weight, variation } = getRowInputs(row);
+        const enabled = row <= rowsEnabled;
+
+        base.disabled = !enabled;
+        final.disabled = !enabled;
+        weight.disabled = !enabled;
+
+        if (!enabled) {
+          variation.textContent = '—';
+          continue;
+        }
+
+        const baseVal = parseLocaleNumber(base.value);
+        const finalVal = parseLocaleNumber(final.value);
+        const weightVal = parseLocaleNumber(weight.value) || 0;
+
+        let varVal = 0;
+        if (Number.isFinite(baseVal) && Number.isFinite(finalVal) && baseVal !== 0) {
+          varVal = (finalVal - baseVal) / baseVal;
+        }
+
+        variation.textContent = formatPercent(varVal);
+        weightedSum += varVal * (weightVal / 100);
+        weightSum += (weightVal / 100);
+      }
+
+      if (Math.abs(weightSum - 1) < 0.000001) {
+        weightsStatusEl.textContent = 'Somma pesi: OK (100%)';
+        weightsStatusEl.className = 'status ok';
+      } else {
+        weightsStatusEl.textContent = `Somma pesi: ${formatPercent(weightSum)} (deve essere 100%)`;
+        weightsStatusEl.className = 'status warn';
+      }
+
+      const weightedVariation = weightSum === 0 ? 0 : (weightedSum / weightSum);
+
+      let revision = 0;
+      if (Math.abs(weightedVariation) <= threshold) {
+        revision = 0;
+        thresholdInfoEl.textContent = `Entro soglia (±${formatPercent(threshold)})`;
+      } else if (weightedVariation > threshold) {
+        revision = amount * quota * (weightedVariation - threshold);
+        thresholdInfoEl.textContent = `Oltre soglia in aumento`;
+      } else {
+        revision = amount * quota * (weightedVariation + threshold);
+        thresholdInfoEl.textContent = `Oltre soglia in diminuzione`;
+      }
+
+      const updated = amount + revision;
+
+      weightedVarEl.textContent = formatPercent(weightedVariation);
+      revisionAmountEl.textContent = formatCurrency(revision);
+      updatedAmountEl.textContent = formatCurrency(updated);
+    }
+
+    function resetAll() {
+      amountEl.value = '0';
+      thresholdEl.value = '5';
+      quotaEl.value = '80';
+      rowsEnabledEl.value = '10';
+      for (let row = 1; row <= 10; row++) {
+        const { base, final, weight } = getRowInputs(row);
+        base.value = '0';
+        final.value = '0';
+        weight.value = '0';
+      }
+      calculate();
+    }
+
+    buildRows();
+
+    document.getElementById('calcBtn').addEventListener('click', calculate);
+    document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+    document.addEventListener('input', (e) => {
+      if (e.target.matches('input')) {
+        calculate();
+      }
+    });
+
+    calculate();
+  </script>
+</body>
+</html>
